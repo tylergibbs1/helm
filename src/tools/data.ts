@@ -11,7 +11,8 @@ export const dataTools = {
       "Returns: { rows, columns?, count? } depending on query type.\n" +
       "When to use: For structured extraction when you know the CSS selectors. Use `data_analyze_page` first to discover selectors.\n" +
       "Pitfalls: Check SQL syntax — the FROM clause takes CSS selectors, not table names. " +
-      "Quote selectors with spaces. Fields: 'text' for textContent, '@attr' for attributes (e.g. @href), '.selector' for nested CSS.\n" +
+      "Quote selectors with spaces. Always use a LIMIT clause to avoid large results. " +
+      "Fields: 'text' for textContent, '@attr' for attributes (e.g. @href), '.selector' for nested CSS.\n" +
       "Examples:\n" +
       "  SELECT text, @href FROM a WHERE text LIKE '%pricing%'\n" +
       '  SELECT .title, .price FROM ".product-card" ORDER BY .price LIMIT 10\n' +
@@ -29,11 +30,27 @@ export const dataTools = {
       const page = await getActivePage();
       const result = await runDomql(page, sql);
 
+      const MAX_QUERY_BYTES = 15_000;
+      let serialized = JSON.stringify(result);
+
+      if (serialized.length > MAX_QUERY_BYTES) {
+        // Truncate rows to fit
+        const truncated = { ...result };
+        const totalRows = truncated.rows.length;
+        while (JSON.stringify(truncated).length > MAX_QUERY_BYTES && truncated.rows.length > 1) {
+          truncated.rows = truncated.rows.slice(0, Math.ceil(truncated.rows.length * 0.7));
+        }
+        (truncated as any)._truncated = true;
+        (truncated as any)._total_rows = totalRows;
+        (truncated as any)._hint = "Add a LIMIT clause or WHERE filter to narrow results.";
+        serialized = JSON.stringify(truncated);
+      }
+
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(result),
+            text: serialized,
           },
         ],
       };
@@ -120,8 +137,10 @@ export const dataTools = {
     description:
       "Extract structured data from the current page matching a caller-defined schema.\n" +
       "Returns: { mode, data, item_count, confidence, container_selector?, field_mapping[] }\n" +
-      "When to use: When you know what fields you want (e.g., product name, price, URL) and want structured output " +
-      "without manually chaining `data_analyze_page` → `data_query`. Handles both single items and lists automatically.\n" +
+      "When to use: When you need specific named fields with types (e.g., product name as text, price as number, link as URL). " +
+      "Handles both single items and repeating lists automatically. " +
+      "For quick keyword-based extraction (\"get the table\", \"show me all links\"), use `obs_extract` instead. " +
+      "For manual CSS-selector queries, use `data_analyze_page` + `data_query`.\n" +
       "Pitfalls: Works best on pages with clear data structure. For complex custom extraction, use `data_analyze_page` + `data_query` instead.\n" +
       "Examples:\n" +
       '  fields: [{name: "title", description: "product name", type: "text"}, {name: "price", description: "product price", type: "price"}]\n' +
@@ -146,7 +165,8 @@ export const dataTools = {
       mode: z
         .enum(["single", "list", "auto"])
         .default("auto")
-        .describe("'single' for one item, 'list' for repeating items, 'auto' to detect (default)"),
+        .describe("'single' extracts one item (detail pages). 'list' extracts repeating items (search results, tables). " +
+          "'auto' (default) tries list first — if 2+ repeating items are detected, uses list mode; otherwise falls back to single."),
       max_items: z
         .number()
         .default(50)

@@ -113,8 +113,10 @@ export const observationTools = {
     description:
       "Extract a specific piece of information from the current page by natural language description.\n" +
       "Returns: { type: 'table'|'errors'|'links'|'headings'|'content'|'search', data: ... }\n" +
-      "When to use: When you need structured data (tables, links, headings, error messages) or page text. " +
-      "For repeating patterns, prefer `data_analyze_page` to discover selectors, then `data_query` for precise extraction.\n" +
+      "When to use: For quick, keyword-driven extraction — tables, links, headings, error messages, or page text. " +
+      "Just describe what you want in plain English. " +
+      "For typed, schema-driven extraction (specific named fields with types like price/date/url), use `data_extract` instead. " +
+      "For repeating patterns with CSS selectors, prefer `data_analyze_page` → `data_query`.\n" +
       "Pitfalls: Large tables are auto-truncated (default 50 rows). Pass `max_rows` to override.",
     schema: z.object({
       what: z

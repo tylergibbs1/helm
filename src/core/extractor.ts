@@ -242,11 +242,13 @@ async function extractList(
 
   // Cap response size
   let result = data;
+  const totalItems = result.length;
   let serialized = JSON.stringify(result);
   while (serialized.length > MAX_EXTRACT_BYTES && result.length > 1) {
     result = result.slice(0, Math.ceil(result.length * 0.8));
     serialized = JSON.stringify(result);
   }
+  const wasTruncated = result.length < totalItems;
 
   const avgScore = mapping.reduce((s, m) => s + m.score, 0) / mapping.length;
 
@@ -254,6 +256,7 @@ async function extractList(
     mode: "list",
     data: result,
     item_count: result.length,
+    ...(wasTruncated ? { _truncated: true, _total_items: totalItems } : {}),
     confidence: Math.round(avgScore * 100) / 100,
     container_selector: schema.containerSelector,
     field_mapping: mapping,

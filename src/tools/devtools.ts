@@ -17,14 +17,22 @@ export const devtoolsTools = {
       "Evaluate a JavaScript expression via Chrome DevTools Protocol (CDP Runtime.evaluate).\n" +
       "Returns: { result, error? }\n" +
       "When to use: For raw JS evaluation bypassing Playwright's sandbox — useful for accessing " +
-      "browser internals, service workers, or expressions that need full page context.\n" +
-      "Pitfalls: The expression must be a single evaluatable expression or IIFE. Avoid long-running scripts.",
+      "browser internals, service workers, localStorage, performance timing, or expressions that need full page context. " +
+      "Prefer `data_query` for structured DOM extraction and `obs_extract` for quick content reads.\n" +
+      "Examples:\n" +
+      "  localStorage.getItem('authToken')\n" +
+      "  performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd\n" +
+      "  document.querySelectorAll('*').length\n" +
+      "  JSON.stringify({cookies: document.cookie, url: location.href})\n" +
+      "  (function(){ /* multi-statement logic */ return result; })()\n" +
+      "Pitfalls: Must be a single expression or IIFE. Results over 10KB are truncated. Avoid long-running scripts.",
     schema: z.object({
       expression: z
         .string()
         .describe("JavaScript expression to evaluate in the page context"),
     }),
     handler: async ({ expression }: { expression: string }) => {
+      const MAX_EVAL_BYTES = 10_000;
       const page = await getActivePage();
       const session = await getCDPSession(page);
       const { result, exceptionDetails } = await runtimeEvaluate(session, expression);
@@ -34,8 +42,20 @@ export const devtoolsTools = {
         output.error = exceptionDetails.text || exceptionDetails.exception?.description || "Evaluation error";
       }
 
+      let serialized = JSON.stringify(output);
+      if (serialized.length > MAX_EVAL_BYTES) {
+        const truncatedResult = typeof result === "string"
+          ? result.substring(0, MAX_EVAL_BYTES - 200)
+          : JSON.stringify(result).substring(0, MAX_EVAL_BYTES - 200);
+        serialized = JSON.stringify({
+          result: truncatedResult,
+          _truncated: true,
+          _hint: "Result exceeded 10KB. Use more targeted expressions or filter in the expression itself.",
+        });
+      }
+
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(output) }],
+        content: [{ type: "text" as const, text: serialized }],
       };
     },
   },
@@ -98,8 +118,13 @@ export const devtoolsTools = {
         .string()
         .optional()
         .describe("Optional regex pattern to filter captured requests by URL"),
+      include_headers: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("If true, include response headers in each request (default: false to save tokens)"),
     }),
-    handler: async ({ url_pattern }: { url_pattern?: string }) => {
+    handler: async ({ url_pattern, include_headers }: { url_pattern?: string; include_headers: boolean }) => {
       if (!activeCapture) {
         return {
           content: [
@@ -120,8 +145,9 @@ export const devtoolsTools = {
         : activeCapture.getRequests();
       activeCapture = null;
 
-      // Strip responseHeaders to keep output concise
-      const concise = requests.map(({ responseHeaders, ...rest }) => rest);
+      const concise = include_headers
+        ? requests
+        : requests.map(({ responseHeaders, ...rest }) => rest);
 
       return {
         content: [

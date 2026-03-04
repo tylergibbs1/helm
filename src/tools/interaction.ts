@@ -262,11 +262,14 @@ export const interactionTools = {
       "Press a keyboard key or shortcut.\n" +
       "Returns: { pressed }\n" +
       'When to use: For Enter, Escape, Tab, arrow keys, or shortcuts like "Control+a". Use after filling a search field to submit.\n' +
-      "Pitfalls: Key names are case-sensitive. Use Playwright key names (e.g., 'ArrowDown', not 'Down').",
+      "Common keys: Enter, Escape, Tab, Backspace, Delete, Space, " +
+      "ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown, " +
+      "Control, Shift, Alt, Meta. Shortcuts: Control+a, Control+c, Control+v, Shift+Tab.\n" +
+      "Pitfalls: Key names are case-sensitive — use exact Playwright names (e.g., 'ArrowDown' not 'Down', 'Backspace' not 'Back').",
     schema: z.object({
       key: z
         .string()
-        .describe('The key to press (e.g., "Enter", "Escape", "Tab", "Control+a", "ArrowDown")'),
+        .describe('The key to press (e.g., "Enter", "Escape", "Tab", "Backspace", "Control+a", "ArrowDown", "Shift+Tab")'),
     }),
     handler: async ({ key }: { key: string }) => {
       const page = await getActivePage();
