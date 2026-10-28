@@ -2,14 +2,17 @@
 
 Semantic browser automation MCP server. Tell it what to do in plain English — it figures out the selectors.
 
-Helm gives AI agents a full browser through 24 tools: navigate pages, fill forms, click buttons, extract structured data, capture network traffic, and profile performance. No CSS selectors or XPaths required.
+Helm gives AI agents a full browser through 27 tools: navigate pages, fill forms, click buttons, extract structured data, capture network traffic, and profile performance. No CSS selectors or XPaths required.
 
 ## Quick Start
 
 ```bash
 bun install
+bunx playwright install chromium   # one-time browser download
 bun run src/server.ts
 ```
+
+Helm opens a visible (headed) Chromium window.
 
 ### Connect to Claude Code
 
@@ -229,9 +232,9 @@ Yes. They're independent MCP servers. Some teams use Playwright MCP for simple n
 ## Development
 
 ```bash
-bun test                 # Run tests
-bunx tsc --noEmit        # Typecheck
-bun run --watch src/server.ts  # Dev mode with auto-reload
+bun test                 # Run tests (tests/unit, tests/e2e)
+bun run typecheck        # Typecheck
+bun run dev              # Dev mode with auto-reload
 ```
 
 ## License
